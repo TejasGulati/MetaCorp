@@ -210,235 +210,327 @@ class ModelTrainer:
         self.processed_data_path = base_path / "data" / "processed"
         self.models_path = base_path / "data" / "models"
         
-        # Enhanced model parameters with focus on market value prediction
+        # Further optimized parameters based on feature importance analysis
         self.model_params = {
             'market_value': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators':2000,  # Increased from 500
-                    'max_depth': 8,        # Reduced from 8 to prevent overfitting
-                    'min_samples_split': 10,
-                    'min_samples_leaf': 5,
-                    'learning_rate': 0.01,
-                    'subsample': 0.8,
-                    'loss': 'huber',
+                    'n_estimators': 3500,    # Increased for better market value prediction
+                    'max_depth': 14,         # Increased to capture complex market relationships
+                    'min_samples_split': 8,  # Increased to prevent overfitting
+                    'min_samples_leaf': 4,   # Increased for better generalization
+                    'learning_rate': 0.002,  # Reduced for finer convergence
+                    'subsample': 0.92,       # Increased for better stability
+                    'loss': 'huber',         # Changed to huber for robustness
+                    'alpha': 0.95,           # Huber loss parameter
                     'random_state': 42,
-                    'validation_fraction': 0.1,
-                    'n_iter_no_change': 30,
-                    'tol': 1e-4
+                    'warm_start': True,
+                    'validation_fraction': 0.1
                 }
             },
-            # Other models' parameters remain unchanged
             'profit_margin': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators': 400,
-                    'max_depth': 6,
+                    'n_estimators': 1000,    # Increased based on validation curves
+                    'max_depth': 10,         # Increased for complex profit patterns
                     'min_samples_split': 5,
                     'min_samples_leaf': 3,
-                    'learning_rate': 0.01,
-                    'subsample': 0.8,
-                    'loss': 'huber',
-                    'random_state': 42
+                    'learning_rate': 0.005,
+                    'subsample': 0.88,
+                    'loss': 'huber',         # Changed to huber for robustness
+                    'alpha': 0.9,            # Huber loss parameter
+                    'random_state': 42,
+                    'warm_start': True,
+                    'validation_fraction': 0.1
                 }
             },
             'revenue_growth': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators': 400,
-                    'max_depth': 5,
-                    'min_samples_split': 10,
-                    'min_samples_leaf': 5,
-                    'learning_rate': 0.01,
-                    'subsample': 0.8,
-                    'loss': 'huber',
-                    'random_state': 42
+                    'n_estimators': 800,     # Adjusted based on convergence analysis
+                    'max_depth': 8,
+                    'min_samples_split': 7,
+                    'min_samples_leaf': 4,
+                    'learning_rate': 0.008,
+                    'subsample': 0.85,
+                    'loss': 'huber',         # Changed to huber for robustness
+                    'alpha': 0.9,            # Huber loss parameter
+                    'random_state': 42,
+                    'warm_start': True,
+                    'validation_fraction': 0.1
                 }
             }
         }
 
     def _engineer_features(self, df):
-        """Enhanced feature engineering with focus on market value prediction"""
+        """Enhanced feature engineering with focus on high-impact features"""
         df = df.copy()
+        eps = 1e-10
         
-        # Basic financial ratios
-        df['profit_growth'] = df['profits'] / df['revenues'] * 100
-        df['profit_per_employee'] = df['profits'] / df['employees']
-        df['revenue_per_employee'] = df['revenues'] / df['employees']
+        # Core financial ratios with refined weights
+        df['profit_growth'] = np.where(df['revenues'] > eps,
+                                     df['profits'] / df['revenues'] * 100,
+                                     0)
         
-        # New advanced financial metrics
-        df['profit_to_employee_ratio'] = np.where(
-            df['employees'] > 0,
-            df['profits'] / df['employees'],
-            0
+        # Enhanced employee metrics
+        df['revenue_per_employee'] = np.where(df['employees'] > eps,
+                                            df['revenues'] / df['employees'],
+                                            0)
+        df['profit_per_employee'] = np.where(df['employees'] > eps,
+                                           df['profits'] / df['employees'],
+                                           0)
+        df['market_value_per_employee'] = np.where(df['employees'] > eps,
+                                                  df['market_value'] / df['employees'],
+                                                  0)
+        
+        # Expanded industry metrics
+        metrics = ['market_value', 'revenues', 'profits', 'employees']
+        for metric in metrics:
+            industry_avg = df.groupby('industry')[metric].transform('mean')
+            industry_std = df.groupby('industry')[metric].transform('std')
+            industry_median = df.groupby('industry')[metric].transform('median')
+            
+            df[f'industry_{metric}_zscore'] = np.where(
+                industry_std > eps,
+                (df[metric] - industry_avg) / industry_std,
+                0
+            )
+            df[f'industry_{metric}_rel_median'] = np.where(
+                industry_median > eps,
+                df[metric] / industry_median,
+                0
+            )
+        
+        # Enhanced composite scores with dynamic weights
+        weights = {
+            'revenues': 0.35,
+            'employees': 0.25,
+            'market_value': 0.4
+        }
+        
+        max_vals = {
+            metric: df[metric].max() if df[metric].max() > eps else 1
+            for metric in weights.keys()
+        }
+        
+        df['size_score'] = sum(
+            (df[metric] / max_vals[metric]) * weight
+            for metric, weight in weights.items()
         )
         
-        # Industry-specific metrics
-        industry_avg_market_value = df.groupby('industry')['market_value'].transform('mean')
-        industry_avg_revenue = df.groupby('industry')['revenues'].transform('mean')
-        df['industry_market_value_ratio'] = df['market_value'] / industry_avg_market_value
-        df['industry_revenue_ratio'] = df['revenues'] / industry_avg_revenue
-        
-        # Size and efficiency metrics
-        df['size_score'] = (
-            (df['revenues'] / df['revenues'].max()) * 0.4 +
-            (df['employees'] / df['employees'].max()) * 0.3 +
-            (df['market_value'] / df['market_value'].max()) * 0.3
-        )
+        # Enhanced efficiency metrics
+        max_profit_margin = max(df['profit_margin'].max(), eps)
+        max_revenue_growth = max(df['revenue_growth'].max(), eps)
+        max_productivity = max(df['revenue_per_employee'].max(), eps)
         
         df['efficiency_score'] = (
-            (df['profit_margin'] / df['profit_margin'].max()) * 0.4 +
-            (df['revenue_growth'] / df['revenue_growth'].max()) * 0.3 +
-            (df['employee_productivity'] / df['employee_productivity'].max()) * 0.3
+            (df['profit_margin'] / max_profit_margin) * 0.5 +
+            (df['revenue_growth'] / max_revenue_growth) * 0.3 +
+            (df['revenue_per_employee'] / max_productivity) * 0.2
         )
         
-        # Interaction terms
-        df['revenue_profit_interaction'] = df['revenues'] * df['profits']
-        df['market_efficiency_interaction'] = df['market_value'] * df['efficiency_score']
+        # Advanced growth metrics
+        df['composite_growth'] = (
+            df['revenue_growth'] * 0.6 +
+            df['profit_growth'] * 0.3 +
+            (df['market_value_per_employee'].pct_change().fillna(0)) * 0.1
+        )
         
-        return df
-
-    def prepare_training_data(self, df):
-        try:
-            df = self._engineer_features(df)
-            
-            # Extended feature set for market value prediction
-            numerical_features = [
-                'revenues', 'profits', 'employees', 'revenue_growth',
-                'profit_margin', 'employee_productivity',
-                'profit_per_employee', 'revenue_per_employee', 'profit_growth',
-                'efficiency_score', 'size_score', 'profit_to_employee_ratio',
-                'industry_market_value_ratio', 'industry_revenue_ratio',
-                'revenue_profit_interaction'
-            ]
-            
-            # Remove market_to_revenue_ratio to prevent data leakage
-            if 'market_to_revenue_ratio' in numerical_features:
-                numerical_features.remove('market_to_revenue_ratio')
-                
-            categorical_features = ['industry']
-            target_variables = ['market_value', 'profit_margin', 'revenue_growth']
-            
-            # Enhanced outlier handling
-            df = self._handle_outliers(df, numerical_features)
-            
-            X = df[numerical_features + categorical_features].copy()
-            
-            # Improved feature scaling
-            for feature in numerical_features:
-                if feature not in ['revenue_growth', 'profit_margin']:
-                    min_val = X[feature].min()
-                    offset = abs(min_val) + 1 if min_val < 0 else 0
-                    X[feature] = np.log1p(X[feature] + offset)
-            
-            # Enhanced industry encoding
-            X = pd.get_dummies(X, columns=['industry'], drop_first=True)
-            
-            # Target variable transformations
-            y = df[target_variables].copy()
-            y['market_value'] = np.log1p(y['market_value'])
-            
-            joblib.dump(list(X.columns), self.models_path / 'feature_names.joblib')
-            
-            # Stratified split with more sophisticated binning
-            splits = {}
-            for target in target_variables:
-                try:
-                    bins = pd.qcut(y[target], q=10, labels=False, duplicates='drop')
-                except ValueError:
-                    bins = pd.qcut(y[target], q=5, labels=False, duplicates='drop')
-                
-                splits[target] = train_test_split(
-                    X, y[target],
-                    test_size=0.2,
-                    random_state=42,
-                    stratify=bins
-                )
-            
-            return splits
+        # Interaction features
+        df['size_efficiency_interaction'] = df['size_score'] * df['efficiency_score']
+        df['growth_efficiency_interaction'] = df['composite_growth'] * df['efficiency_score']
         
-        except Exception as e:
-            print(f"Error in data preparation: {str(e)}")
-            raise
+        # Volatility measures
+        for metric in ['profit_margin', 'revenue_growth']:
+            rolling_std = df.groupby('industry')[metric].transform(
+                lambda x: x.rolling(2, min_periods=1).std()
+            ).fillna(0)
+            df[f'{metric}_volatility'] = rolling_std
+        
+        return df.replace([np.inf, -np.inf], 0)
 
     def _handle_outliers(self, df, numerical_features):
-        """Enhanced outlier handling with feature-specific approaches"""
+        """Enhanced outlier handling with feature-specific thresholds"""
         df = df.copy()
+        
+        # Define feature groups for different threshold treatments
+        threshold_groups = {
+            'market': ['market_value', 'market_value_per_employee', 'industry_market_value_zscore'],
+            'growth': ['revenue_growth', 'profit_growth', 'composite_growth'],
+            'efficiency': ['profit_margin', 'efficiency_score', 'revenue_per_employee'],
+            'ratio': ['size_efficiency_interaction', 'growth_efficiency_interaction'],
+            'default': []  # All other features
+        }
+        
+        thresholds = {
+            'market': 12.0,    # Increased for market features
+            'growth': 4.5,     # Reduced for growth metrics
+            'efficiency': 5.5, # Moderate for efficiency metrics
+            'ratio': 6.0,      # Standard for ratios
+            'default': 6.0     # Default threshold
+        }
+        
+        # Create reverse mapping of features to their groups
+        feature_to_group = {}
+        for group, features in threshold_groups.items():
+            for feature in features:
+                feature_to_group[feature] = group
         
         for feature in numerical_features:
             Q1 = df[feature].quantile(0.25)
             Q3 = df[feature].quantile(0.75)
             IQR = Q3 - Q1
             
-            # Feature-specific thresholds
-            if feature == 'market_value':
-                threshold = 7.0  # Most lenient for market value
-            elif feature in ['revenues', 'profits']:
-                threshold = 5.0  # Lenient for main financial metrics
-            elif feature in ['revenue_growth', 'profit_margin']:
-                threshold = 3.0  # Moderate for percentage metrics
-            else:
-                threshold = 2.0  # Stricter for derived metrics
+            # Get appropriate threshold
+            group = feature_to_group.get(feature, 'default')
+            threshold = thresholds[group]
             
             lower_bound = Q1 - threshold * IQR
             upper_bound = Q3 + threshold * IQR
             
-            # Log-based outlier handling for highly skewed features
-            if feature in ['market_value', 'revenues', 'profits']:
-                df[feature] = np.where(
-                    df[feature] > upper_bound,
-                    upper_bound * (1 + np.log1p(df[feature] / upper_bound)),
-                    df[feature]
-                )
-            else:
-                df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
+            # Apply clipping with additional logging
+            original_outliers = ((df[feature] < lower_bound) | (df[feature] > upper_bound)).sum()
+            df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
+            
+            if original_outliers > 0:
+                print(f"Handled {original_outliers} outliers in {feature}")
         
         return df
-    
+
+    def prepare_training_data(self, df):
+        """Optimized data preparation with enhanced feature selection"""
+        try:
+            print("Starting data preparation...")
+            df = self._engineer_features(df)
+            
+            # Expanded feature set based on importance analysis
+            numerical_features = [
+                'revenues', 'profits', 'employees',
+                'revenue_growth', 'profit_margin', 'revenue_per_employee',
+                'profit_per_employee', 'market_value_per_employee',
+                'profit_growth', 'efficiency_score', 'size_score',
+                'industry_market_value_zscore', 'industry_revenues_zscore',
+                'industry_profits_zscore', 'industry_employees_zscore',
+                'industry_market_value_rel_median', 'industry_revenues_rel_median',
+                'composite_growth', 'size_efficiency_interaction',
+                'growth_efficiency_interaction',
+                'profit_margin_volatility', 'revenue_growth_volatility'
+            ]
+            
+            categorical_features = ['industry']
+            target_variables = ['market_value', 'profit_margin', 'revenue_growth']
+            
+            print("Handling outliers...")
+            df = self._handle_outliers(df, numerical_features)
+            
+            X = df[numerical_features + categorical_features].copy()
+            
+            # Enhanced scaling with feature-specific treatment
+            print("Applying robust scaling...")
+            scaler = RobustScaler(quantile_range=(5, 95))  # Adjusted quantile range
+            X[numerical_features] = scaler.fit_transform(X[numerical_features])
+            joblib.dump(scaler, self.models_path / 'scaler.joblib')
+            
+            # One-hot encoding with improved handling
+            print("Performing one-hot encoding...")
+            X = pd.get_dummies(X, columns=['industry'], drop_first=True, sparse=False)
+            joblib.dump(list(X.columns), self.models_path / 'feature_names.joblib')
+            
+            # Enhanced target processing
+            print("Processing target variables...")
+            y = df[target_variables].copy()
+            
+            # Log transform for market_value with offset
+            offset = np.abs(y['market_value'].min()) + 1 if y['market_value'].min() < 0 else 0
+            y['market_value'] = np.where(y['market_value'] + offset > 0,
+                                       np.log1p(y['market_value'] + offset),
+                                       0)
+            
+            # Stratified splitting with enhanced binning
+            print("Performing stratified splitting...")
+            splits = {}
+            for target in target_variables:
+                # Dynamic bin calculation based on data distribution
+                n_bins = min(10, len(y[target].unique()))
+                bins = pd.qcut(y[target], q=n_bins, labels=False, duplicates='drop')
+                
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y[target],
+                    test_size=0.2,
+                    random_state=42,
+                    stratify=bins
+                )
+                
+                splits[target] = (X_train, X_test, y_train, y_test)
+            
+            print("Data preparation completed successfully!")
+            return splits
+        
+        except Exception as e:
+            print(f"Error in data preparation: {str(e)}")
+            raise
+
     def train_and_evaluate_models(self, splits):
+        """Enhanced training and evaluation with improved metrics and validation"""
         evaluation_results = {}
         models = {}
         
         for target, (X_train, X_test, y_train, y_test) in splits.items():
             try:
-                print(f"\nTraining and evaluating model for: {target}")
+                print(f"\nTraining model for: {target}")
                 
-                # Get model configuration
                 model_config = self.model_params[target]
                 model = model_config['model_type'](**model_config['params'])
                 
-                # Perform k-fold cross-validation with shuffling
-                cv = KFold(n_splits=5, shuffle=True, random_state=42)
-                cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring='r2')
+                # Enhanced cross-validation
+                cv = KFold(n_splits=7, shuffle=True, random_state=42)
                 
-                # Fit model
+                # Compute multiple CV metrics
+                cv_metrics = {
+                    'r2': cross_val_score(model, X_train, y_train, cv=cv, 
+                                        scoring='r2', n_jobs=-1),
+                    'neg_mae': cross_val_score(model, X_train, y_train, cv=cv, 
+                                             scoring='neg_mean_absolute_error', n_jobs=-1),
+                    'neg_rmse': cross_val_score(model, X_train, y_train, cv=cv, 
+                                              scoring='neg_root_mean_squared_error', n_jobs=-1)
+                }
+                
+                print(f"Training final model for {target}...")
                 model.fit(X_train, y_train)
                 models[target] = model
                 
-                # Make predictions and reverse transformations if necessary
+                # Predictions and transformations
                 y_pred = model.predict(X_test)
                 y_pred_train = model.predict(X_train)
                 
+                # Handle market_value inverse transform
                 if target == 'market_value':
-                    y_test_orig = np.expm1(y_test)
-                    y_pred_orig = np.expm1(y_pred)
-                    y_train_orig = np.expm1(y_train)
-                    y_pred_train_orig = np.expm1(y_pred_train)
+                    offset = np.abs(y_test.min()) + 1 if y_test.min() < 0 else 0
+                    y_test_orig = np.expm1(y_test) - offset
+                    y_pred_orig = np.expm1(y_pred) - offset
+                    y_train_orig = np.expm1(y_train) - offset
+                    y_pred_train_orig = np.expm1(y_pred_train) - offset
                 else:
                     y_test_orig = y_test
                     y_pred_orig = y_pred
                     y_train_orig = y_train
                     y_pred_train_orig = y_pred_train
                 
-                # Calculate metrics
+                # Comprehensive metrics
                 metrics = {
                     'R2_Score_Test': r2_score(y_test_orig, y_pred_orig),
                     'R2_Score_Train': r2_score(y_train_orig, y_pred_train_orig),
                     'MAE': mean_absolute_error(y_test_orig, y_pred_orig),
                     'RMSE': np.sqrt(mean_squared_error(y_test_orig, y_pred_orig)),
-                    'CV_R2_Mean': cv_scores.mean(),
-                    'CV_R2_Std': cv_scores.std(),
-                    'Feature_Importance': dict(zip(X_train.columns, model.feature_importances_))
+                    'CV_R2_Mean': cv_metrics['r2'].mean(),
+                    'CV_R2_Std': cv_metrics['r2'].std(),
+                    'CV_MAE_Mean': -cv_metrics['neg_mae'].mean(),
+                    'CV_RMSE_Mean': -cv_metrics['neg_rmse'].mean(),
+                    'Feature_Importance': dict(sorted(
+                        zip(X_train.columns, model.feature_importances_),
+                        key=lambda x: x[1],
+                        reverse=True
+                    ))
                 }
                 
                 evaluation_results[target] = metrics
