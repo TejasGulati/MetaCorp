@@ -18,6 +18,7 @@ class Scenario(models.Model):
     def __str__(self):
         return f"{self.company.name} - {self.name}"
 
+
 class Simulation(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
