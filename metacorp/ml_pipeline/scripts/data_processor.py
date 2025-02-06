@@ -11,11 +11,11 @@ import os
 
 class DataProcessor:
     """
-    Data processor for company financial data.
+    Enhanced data processor for company financial data.
     
     Column Descriptions and Units:
     - name: Company name (string)
-    - industry: Industry/sector classification (string)
+    - industry/sector: Industry/sector classification (string)
     - revenues: Annual revenue in millions USD
     - profits: Annual profit/income in millions USD
     - market_value: Market capitalization in millions USD
@@ -24,20 +24,12 @@ class DataProcessor:
     - profit_margin: Profit as percentage of revenue (percentage)
     - employee_productivity: Revenue per employee (USD per employee)
     - market_to_revenue_ratio: Market value divided by revenue (ratio)
-
-    Data Sources:
-    1. Fortune 1000 Companies:
-       - Revenues: Millions USD
-       - Profits: Millions USD
-       - Market Value: Millions USD
-       - Employees: Headcount
-       - Revenue Growth: Percentage change
-
-    2. Tech Companies:
-       - Original revenues in billions USD (converted to millions)
-       - Original profits in billions USD (converted to millions)
-       - Original market value in trillions USD (converted to millions)
-       - Employees: Headcount
+    - rank: Fortune 1000 ranking (integer)
+    - rank_change: Change in ranking from previous year (integer)
+    - ceo_founder: CEO is company founder (boolean)
+    - ceo_woman: CEO is woman (boolean)
+    - profitable: Company is profitable (boolean)
+    - market_cap: Market capitalization (millions USD)
     """
 
     def __init__(self):
@@ -50,7 +42,7 @@ class DataProcessor:
         for path in [self.raw_data_path, self.processed_data_path, self.models_path]:
             path.mkdir(parents=True, exist_ok=True)
 
-        # Define column units for documentation and validation
+        # Enhanced column units with new metrics
         self.column_units = {
             'name': 'string',
             'industry': 'string',
@@ -61,15 +53,17 @@ class DataProcessor:
             'revenue_growth': 'percentage',
             'profit_margin': 'percentage',
             'employee_productivity': 'USD per employee',
-            'market_to_revenue_ratio': 'ratio'
+            'market_to_revenue_ratio': 'ratio',
+            'rank': 'integer',
+            'rank_change': 'integer',
+            'ceo_founder': 'boolean',
+            'ceo_woman': 'boolean',
+            'profitable': 'boolean',
+            'market_cap': 'millions USD'
         }
 
-    
     def clean_monetary_value(self, value):
-        """
-        Helper function to clean monetary values
-        Returns: float value in millions USD
-        """
+        """Enhanced helper function to clean monetary values"""
         if pd.isna(value) or str(value).strip() in ['-', '']:
             return 0
         try:
@@ -82,10 +76,7 @@ class DataProcessor:
             return 0
 
     def clean_numeric_value(self, value):
-        """
-        Helper function to clean numeric values
-        Returns: float value
-        """
+        """Enhanced helper function to clean numeric values"""
         if pd.isna(value) or str(value).strip() in ['-', '']:
             return 0
         try:
@@ -93,115 +84,198 @@ class DataProcessor:
         except (ValueError, TypeError):
             return 0
     
+    def clean_boolean_value(self, value):
+        """Helper function to clean boolean values"""
+        if pd.isna(value):
+            return False
+        return str(value).lower() in ['yes', 'true', '1', 'y']
+    
     def load_and_combine_data(self):
         """
-        Loads and combines company data from multiple sources.
-        All monetary values are standardized to millions USD.
+        Enhanced data loading function incorporating Fortune 1000 2022 dataset
+        with proper column name handling
         """
         print("Loading CSV files...")
-        # Load Fortune 1000 data (already in millions USD)
-        fortune_df = pd.read_csv(self.raw_data_path / "Fortune_1000_Companies.csv")
-        fortune_df.columns = fortune_df.columns.str.strip().str.lower()
-        
-        # Load Tech company data (needs conversion to millions USD)
-        tech_df = pd.read_csv(self.raw_data_path / "Top_50_US_Tech_Companies.csv")
-        tech_df.columns = tech_df.columns.str.strip()
-        
-        print("Processing Fortune 1000 data...")
-        # Process Fortune 1000 data
-        fortune_processed = pd.DataFrame()
-        fortune_processed['name'] = fortune_df['name'].str.strip()
-        
-        # Handle industry/sector column
-        if 'sector' in fortune_df.columns:
-            fortune_processed['industry'] = fortune_df['sector'].str.strip()
-        else:
-            for possible_column in ['industry', 'business_sector', 'category']:
-                if possible_column in fortune_df.columns:
-                    fortune_processed['industry'] = fortune_df[possible_column].str.strip()
-                    break
+        try:
+            # Load all datasets
+            fortune_df = pd.read_csv(self.raw_data_path / "Fortune_1000_Companies.csv")
+            tech_df = pd.read_csv(self.raw_data_path / "Top_50_US_Tech_Companies.csv")
+            fortune_2022_df = pd.read_csv(self.raw_data_path / "Fortune_1000_2022.csv")
+            
+            # Print column names for debugging
+            print("\nOriginal column names:")
+            print("Fortune 1000:", fortune_df.columns.tolist())
+            print("Tech Companies:", tech_df.columns.tolist())
+            print("Fortune 2022:", fortune_2022_df.columns.tolist())
+            
+            # Standardize column names
+            for df in [fortune_df, tech_df, fortune_2022_df]:
+                df.columns = df.columns.str.strip().str.lower()
+            
+            print("\nStandardized column names:")
+            print("Fortune 1000:", fortune_df.columns.tolist())
+            print("Tech Companies:", tech_df.columns.tolist())
+            print("Fortune 2022:", fortune_2022_df.columns.tolist())
+            
+            print("\nProcessing Fortune 1000 2022 data...")
+            # Process Fortune 2022 data
+            fortune_2022_processed = pd.DataFrame()
+            fortune_2022_processed['name'] = fortune_2022_df['company'].str.strip()
+            fortune_2022_processed['industry'] = fortune_2022_df['sector'].str.strip()
+            fortune_2022_processed['revenues'] = fortune_2022_df['revenue'].apply(self.clean_monetary_value)
+            fortune_2022_processed['profits'] = fortune_2022_df['profit'].apply(self.clean_monetary_value)
+            fortune_2022_processed['employees'] = fortune_2022_df['num. of employees'].apply(self.clean_numeric_value)
+            
+            # Handle market cap if present
+            if 'market cap' in fortune_2022_df.columns:
+                fortune_2022_processed['market_value'] = fortune_2022_df['market cap'].apply(self.clean_monetary_value)
             else:
-                fortune_processed['industry'] = 'Other'
-        
-        # Clean monetary and numeric values using helper functions (values already in millions USD)
-        fortune_processed['revenues'] = fortune_df['revenues'].apply(self.clean_monetary_value)
-        fortune_processed['profits'] = fortune_df['profits'].apply(self.clean_monetary_value)
-        fortune_processed['market_value'] = fortune_df['market_value'].apply(self.clean_monetary_value)
-        fortune_processed['employees'] = fortune_df['employees'].apply(self.clean_numeric_value)
-        
-        # Handle revenue growth (already in percentage)
-        revenue_change_col = next((col for col in fortune_df.columns if 'revenue' in col.lower() and 'change' in col.lower()), None)
-        if revenue_change_col:
-            fortune_processed['revenue_growth'] = fortune_df[revenue_change_col].apply(
-                lambda x: self.clean_numeric_value(str(x).rstrip('%')) if pd.notnull(x) else 0
+                fortune_2022_processed['market_value'] = 0
+            
+            # New features from 2022 dataset
+            fortune_2022_processed['rank'] = fortune_2022_df['rank'].apply(self.clean_numeric_value)
+            fortune_2022_processed['rank_change'] = fortune_2022_df['rank_change'].apply(self.clean_numeric_value)
+            fortune_2022_processed['ceo_founder'] = fortune_2022_df['ceo_founder'].apply(self.clean_boolean_value)
+            fortune_2022_processed['ceo_woman'] = fortune_2022_df['ceo_woman'].apply(self.clean_boolean_value)
+            fortune_2022_processed['profitable'] = fortune_2022_df['profitable'].apply(self.clean_boolean_value)
+            
+            print("\nProcessing original Fortune 1000 data...")
+            # Process original Fortune data
+            fortune_processed = pd.DataFrame()
+            # Handle name column variations
+            name_col = next(col for col in fortune_df.columns if 'name' in col)
+            fortune_processed['name'] = fortune_df[name_col].str.strip()
+            
+            # Handle sector/industry column
+            sector_col = next((col for col in fortune_df.columns if col in ['sector', 'industry']), None)
+            fortune_processed['industry'] = fortune_df[sector_col].str.strip() if sector_col else 'Other'
+            
+            # Handle revenue column variations
+            revenue_col = next(col for col in fortune_df.columns if 'revenues' in col)
+            fortune_processed['revenues'] = fortune_df[revenue_col].apply(self.clean_monetary_value)
+            
+            # Handle profits column variations
+            profits_col = next(col for col in fortune_df.columns if 'profits' in col)
+            fortune_processed['profits'] = fortune_df[profits_col].apply(self.clean_monetary_value)
+            
+            # Handle market value column variations
+            market_col = next(col for col in fortune_df.columns if 'market' in col)
+            fortune_processed['market_value'] = fortune_df[market_col].apply(self.clean_monetary_value)
+            
+            # Handle employees column variations
+            employees_col = next(col for col in fortune_df.columns if 'employees' in col)
+            fortune_processed['employees'] = fortune_df[employees_col].apply(self.clean_numeric_value)
+            
+            # Add placeholder columns for new features
+            fortune_processed['rank'] = fortune_df['rank'].apply(self.clean_numeric_value)
+            fortune_processed['rank_change'] = 0
+            fortune_processed['ceo_founder'] = False
+            fortune_processed['ceo_woman'] = False
+            fortune_processed['profitable'] = fortune_processed['profits'] > 0
+            
+            print("\nProcessing Tech company data...")
+            # Process Tech company data
+            tech_processed = pd.DataFrame()
+            # Handle company name variations
+            company_col = next(col for col in tech_df.columns if 'company' in col.lower())
+            tech_processed['name'] = tech_df[company_col].str.strip()
+            
+            tech_processed['industry'] = 'Technology'
+            
+            # Handle revenue column variations
+            revenue_col = next(col for col in tech_df.columns if 'revenue' in col.lower())
+            tech_processed['revenues'] = tech_df[revenue_col].apply(
+                lambda x: self.clean_numeric_value(x) * 1000  # Convert billions to millions
             )
-        else:
-            fortune_processed['revenue_growth'] = 0
-        
-        print("Processing Tech company data...")
-        # Process Tech company data with unit conversions
-        tech_processed = pd.DataFrame()
-        tech_processed['name'] = tech_df['Company Name'].str.strip()
-        tech_processed['industry'] = 'Technology'
-        
-        # Convert from billions to millions USD
-        tech_processed['revenues'] = tech_df['Annual Revenue 2022-2023 (USD in Billions)'].apply(
-            lambda x: self.clean_numeric_value(x) * 1000  # Convert billions to millions
-        )
-        tech_processed['profits'] = tech_df['Annual Income Tax in 2022-2023 (USD in Billions)'].apply(
-            lambda x: self.clean_numeric_value(x) * 1000  # Convert billions to millions
-        )
-        tech_processed['market_value'] = tech_df['Market Cap (USD in Trillions)'].apply(
-            lambda x: self.clean_numeric_value(x) * 1000000  # Convert trillions to millions
-        )
-        tech_processed['employees'] = tech_df['Employee Size'].apply(self.clean_numeric_value)
-        tech_processed['revenue_growth'] = 0  # placeholder as we don't have historical data (percentage)
-        
-        print("Calculating derived metrics...")
-        # Calculate derived metrics for both datasets
-        for df in [fortune_processed, tech_processed]:
-            # Profit margin (percentage)
-            df['profit_margin'] = np.where(
-                df['revenues'] > 0,
-                (df['profits'] / df['revenues']) * 100,
+            
+            # Handle income/profit column variations
+            income_col = next(col for col in tech_df.columns if 'income' in col.lower())
+            tech_processed['profits'] = tech_df[income_col].apply(
+                lambda x: self.clean_numeric_value(x) * 1000  # Convert billions to millions
+            )
+            
+            # Handle market cap column variations
+            market_col = next(col for col in tech_df.columns if 'market' in col.lower())
+            tech_processed['market_value'] = tech_df[market_col].apply(
+                lambda x: self.clean_numeric_value(x) * 1000000  # Convert trillions to millions
+            )
+            
+            # Handle employee column variations
+            employee_col = next(col for col in tech_df.columns if 'employee' in col.lower())
+            tech_processed['employees'] = tech_df[employee_col].apply(self.clean_numeric_value)
+            
+            # Add placeholder columns for new features
+            tech_processed['rank'] = 0
+            tech_processed['rank_change'] = 0
+            tech_processed['ceo_founder'] = False
+            tech_processed['ceo_woman'] = False
+            tech_processed['profitable'] = tech_processed['profits'] > 0
+            
+            print("\nCombining datasets...")
+            # Combine all datasets
+            dataframes = [fortune_2022_processed, fortune_processed, tech_processed]
+            
+            # Ensure all required columns exist in each dataframe
+            required_columns = ['name', 'industry', 'revenues', 'profits', 'market_value', 
+                              'employees', 'rank', 'rank_change', 'ceo_founder', 'ceo_woman', 
+                              'profitable']
+            
+            for df in dataframes:
+                for col in required_columns:
+                    if col not in df.columns:
+                        if col in ['ceo_founder', 'ceo_woman', 'profitable']:
+                            df[col] = False
+                        else:
+                            df[col] = 0
+            
+            combined_df = pd.concat(dataframes, ignore_index=True)
+            
+            print("\nCalculating derived metrics...")
+            # Calculate derived metrics
+            combined_df['profit_margin'] = np.where(
+                combined_df['revenues'] > 0,
+                (combined_df['profits'] / combined_df['revenues']) * 100,
                 0
             )
             
-            # Employee productivity (USD per employee)
-            df['employee_productivity'] = np.where(
-                df['employees'] > 0,
-                df['revenues'] / df['employees'],
+            combined_df['employee_productivity'] = np.where(
+                combined_df['employees'] > 0,
+                combined_df['revenues'] / combined_df['employees'],
                 0
             )
             
-            # Market to revenue ratio (ratio)
-            df['market_to_revenue_ratio'] = np.where(
-                df['revenues'] > 0,
-                df['market_value'] / df['revenues'],
+            combined_df['market_to_revenue_ratio'] = np.where(
+                combined_df['revenues'] > 0,
+                combined_df['market_value'] / combined_df['revenues'],
                 0
             )
-        
-        print("Combining datasets...")
-        # Combine datasets
-        combined_df = pd.concat([fortune_processed, tech_processed], ignore_index=True)
-        
-        # Remove rows with invalid data
-        combined_df = combined_df[
-            (combined_df['revenues'] > 0) & 
-            (combined_df['employees'] > 0)
-        ]
-        
-        print(f"Final dataset shape: {combined_df.shape}")
-        print(f"Number of Fortune 1000 companies: {len(fortune_processed)}")
-        print(f"Number of Tech companies: {len(tech_processed)}")
-        print("\nColumn Units:")
-        for col, unit in self.column_units.items():
-            print(f"- {col}: {unit}")
-        
-        # Save processed data
-        combined_df.to_csv(self.processed_data_path / "combined_company_data.csv", index=False)
-        return combined_df
-    
+            
+            # Remove duplicates based on name
+            combined_df = combined_df.drop_duplicates(subset=['name'], keep='first')
+            
+            # Remove rows with invalid data
+            combined_df = combined_df[
+                (combined_df['revenues'] > 0) & 
+                (combined_df['employees'] > 0)
+            ]
+            
+            print(f"\nFinal dataset shape: {combined_df.shape}")
+            print("\nColumn Units:")
+            for col, unit in self.column_units.items():
+                if col in combined_df.columns:
+                    print(f"- {col}: {unit}")
+            
+            # Save processed data
+            combined_df.to_csv(self.processed_data_path / "combined_company_data.csv", index=False)
+            return combined_df
+            
+        except Exception as e:
+            print(f"Error in data processing: {str(e)}")
+            print("Stack trace:")
+            import traceback
+            traceback.print_exc()
+            raise
+
 class ModelTrainer:
     def __init__(self, base_path=None):
         if base_path is None:
@@ -211,127 +285,130 @@ class ModelTrainer:
         self.models_path = base_path / "data" / "models"
         self.models_path.mkdir(parents=True, exist_ok=True)
         
-        # Cache file paths
-        self.cache_files = {
-            'scaler': self.models_path / 'scaler.joblib',
-            'feature_names': self.models_path / 'feature_names.joblib',
-            'market_value': self.models_path / 'market_value_model.joblib',
-            'profit_margin': self.models_path / 'profit_margin_model.joblib',
-            'revenue_growth': self.models_path / 'revenue_growth_model.joblib',
-            'evaluation_results': self.models_path / 'evaluation_results.joblib'
-        }
+        # Define targets
+        self.target_variables = ['market_value', 'profit_margin', 'revenue_growth']
         
-        # Further optimized parameters based on feature importance analysis
+        # Reorganized cache files structure by target
+        self.cache_files = {}
+        for target in self.target_variables:
+            self.cache_files[target] = {
+                'model': self.models_path / f'{target}_model.joblib',
+                'scaler': self.models_path / f'{target}_scaler.joblib',
+                'feature_names': self.models_path / f'{target}_feature_names.joblib'
+            }
+        # Global evaluation results cache
+        self.cache_files['evaluation_results'] = self.models_path / 'evaluation_results.joblib'
+        
+        # Optimized model parameters with adjusted parameters for revenue_growth
         self.model_params = {
             'market_value': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators': 3500,    # Increased for better market value prediction
-                    'max_depth': 14,         # Increased to capture complex market relationships
-                    'min_samples_split': 8,  # Increased to prevent overfitting
-                    'min_samples_leaf': 4,   # Increased for better generalization
-                    'learning_rate': 0.002,  # Reduced for finer convergence
-                    'subsample': 0.92,       # Increased for better stability
-                    'loss': 'huber',         # Changed to huber for robustness
-                    'alpha': 0.95,           # Huber loss parameter
-                    'random_state': 42,
-                    'warm_start': True,
-                    'validation_fraction': 0.1
+                    'n_estimators': 3000,
+                    'max_depth': 12,
+                    'min_samples_split': 10,
+                    'min_samples_leaf': 6,
+                    'learning_rate': 0.002,
+                    'subsample': 0.8,
+                    'loss': 'huber',
+                    'alpha': 0.95,
+                    'random_state': 42
                 }
             },
             'profit_margin': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators': 1000,    # Increased based on validation curves
-                    'max_depth': 10,         # Increased for complex profit patterns
-                    'min_samples_split': 5,
-                    'min_samples_leaf': 3,
+                    'n_estimators': 1000,
+                    'max_depth': 8,
+                    'min_samples_split': 8,
+                    'min_samples_leaf': 4,
                     'learning_rate': 0.005,
-                    'subsample': 0.88,
-                    'loss': 'huber',         # Changed to huber for robustness
-                    'alpha': 0.9,            # Huber loss parameter
-                    'random_state': 42,
-                    'warm_start': True,
-                    'validation_fraction': 0.1
+                    'subsample': 0.85,
+                    'loss': 'huber',
+                    'alpha': 0.92,
+                    'random_state': 42
                 }
             },
             'revenue_growth': {
                 'model_type': GradientBoostingRegressor,
                 'params': {
-                    'n_estimators': 800,     # Adjusted based on convergence analysis
-                    'max_depth': 8,
-                    'min_samples_split': 7,
-                    'min_samples_leaf': 4,
-                    'learning_rate': 0.008,
-                    'subsample': 0.85,
-                    'loss': 'huber',         # Changed to huber for robustness
-                    'alpha': 0.9,            # Huber loss parameter
-                    'random_state': 42,
-                    'warm_start': True,
-                    'validation_fraction': 0.1
+                    'n_estimators': 1200,  # Increased for better learning
+                    'max_depth': 6,        # Reduced to prevent overfitting
+                    'min_samples_split': 5,
+                    'min_samples_leaf': 3,
+                    'learning_rate': 0.01,
+                    'subsample': 0.9,
+                    'loss': 'huber',
+                    'alpha': 0.9,
+                    'random_state': 42
                 }
             }
         }
 
-    def _check_cached_models(self):
-        """Check if all required model files exist in cache"""
-        return all(cache_file.exists() for cache_file in self.cache_files.values())
-
-    def _load_cached_models(self):
-        """Load models and related data from cache"""
-        try:
-            print("Loading models from cache...")
-            models = {}
-            for target in ['market_value', 'profit_margin', 'revenue_growth']:
-                models[target] = joblib.load(self.cache_files[target])
+    def _calculate_revenue_growth(self, df):
+        """
+        Calculate revenue growth using historical data and industry comparisons
+        """
+        # Sort by company and year (assuming year information is available)
+        df = df.sort_values(['name', 'year']) if 'year' in df.columns else df.copy()
+        
+        # Calculate YoY revenue growth where possible
+        if 'year' in df.columns:
+            df['revenue_growth'] = df.groupby('name')['revenues'].pct_change() * 100
+        else:
+            # If no year data, estimate growth using industry comparisons
+            industry_median_revenue = df.groupby('industry')['revenues'].transform('median')
+            industry_mean_revenue = df.groupby('industry')['revenues'].transform('mean')
             
-            evaluation_results = joblib.load(self.cache_files['evaluation_results'])
-            scaler = joblib.load(self.cache_files['scaler'])
-            feature_names = joblib.load(self.cache_files['feature_names'])
-            
-            print("Successfully loaded all models and data from cache!")
-            return models, evaluation_results, scaler, feature_names
-        except Exception as e:
-            print(f"Error loading cached models: {str(e)}")
-            return None, None, None, None
-
-    def _save_models(self, models, evaluation_results, scaler, feature_names):
-        """Save models and related data to cache"""
-        try:
-            print("\nSaving models and data to cache...")
-            for target, model in models.items():
-                joblib.dump(model, self.cache_files[target])
-            
-            joblib.dump(evaluation_results, self.cache_files['evaluation_results'])
-            joblib.dump(scaler, self.cache_files['scaler'])
-            joblib.dump(feature_names, self.cache_files['feature_names'])
-            
-            print("Successfully saved all models and data to cache!")
-        except Exception as e:
-            print(f"Error saving models to cache: {str(e)}")
+            # Calculate relative position to industry
+            df['revenue_growth'] = ((df['revenues'] - industry_median_revenue) / 
+                                  (industry_mean_revenue + 1e-10)) * 10
+        
+        # Handle infinities and NANs
+        df['revenue_growth'] = df['revenue_growth'].replace([np.inf, -np.inf], np.nan)
+        
+        # Fill missing values with industry medians
+        industry_median_growth = df.groupby('industry')['revenue_growth'].transform('median')
+        df['revenue_growth'] = df['revenue_growth'].fillna(industry_median_growth)
+        
+        # If still any NANs, fill with global median
+        global_median = df['revenue_growth'].median()
+        df['revenue_growth'] = df['revenue_growth'].fillna(global_median)
+        
+        # Clip extreme values
+        lower_bound = df['revenue_growth'].quantile(0.05)
+        upper_bound = df['revenue_growth'].quantile(0.95)
+        df['revenue_growth'] = df['revenue_growth'].clip(lower_bound, upper_bound)
+        
+        return df
 
     def _engineer_features(self, df):
-        """Enhanced feature engineering with focus on high-impact features"""
+        """Enhanced feature engineering with proper revenue growth calculation"""
         df = df.copy()
+        
+        # Calculate revenue growth first
+        df = self._calculate_revenue_growth(df)
+        
+        # Rest of feature engineering
         eps = 1e-10
-        
-        # Core financial ratios with refined weights
+
+        # Core financial ratios
         df['profit_growth'] = np.where(df['revenues'] > eps,
-                                     df['profits'] / df['revenues'] * 100,
-                                     0)
-        
-        # Enhanced employee metrics
+                                    df['profits'] / df['revenues'] * 100,
+                                    0)
+
+        # Employee metrics
         df['revenue_per_employee'] = np.where(df['employees'] > eps,
-                                            df['revenues'] / df['employees'],
-                                            0)
+                                        df['revenues'] / df['employees'],
+                                        0)
         df['profit_per_employee'] = np.where(df['employees'] > eps,
-                                           df['profits'] / df['employees'],
-                                           0)
+                                       df['profits'] / df['employees'],
+                                       0)
         df['market_value_per_employee'] = np.where(df['employees'] > eps,
-                                                  df['market_value'] / df['employees'],
-                                                  0)
-        
-        # Expanded industry metrics
+                                              df['market_value'] / df['employees'],
+                                              0)
+
+        # Industry metrics
         metrics = ['market_value', 'revenues', 'profits', 'employees']
         for metric in metrics:
             industry_avg = df.groupby('industry')[metric].transform('mean')
@@ -348,115 +425,112 @@ class ModelTrainer:
                 df[metric] / industry_median,
                 0
             )
+
+        # Composite scores
+        max_vals = {metric: max(df[metric].max(), eps) for metric in metrics}
         
-        # Enhanced composite scores with dynamic weights
-        weights = {
-            'revenues': 0.35,
-            'employees': 0.25,
-            'market_value': 0.4
-        }
-        
-        max_vals = {
-            metric: df[metric].max() if df[metric].max() > eps else 1
-            for metric in weights.keys()
-        }
-        
-        df['size_score'] = sum(
-            (df[metric] / max_vals[metric]) * weight
-            for metric, weight in weights.items()
+        df['size_score'] = (
+            (df['revenues'] / max_vals['revenues']) * 0.35 +
+            (df['employees'] / max_vals['employees']) * 0.25 +
+            (df['market_value'] / max_vals['market_value']) * 0.4
         )
-        
-        # Enhanced efficiency metrics
+
+        # Efficiency metrics
         max_profit_margin = max(df['profit_margin'].max(), eps)
-        max_revenue_growth = max(df['revenue_growth'].max(), eps)
-        max_productivity = max(df['revenue_per_employee'].max(), eps)
-        
+        max_revenue_per_employee = max(df['revenue_per_employee'].max(), eps)
+
         df['efficiency_score'] = (
             (df['profit_margin'] / max_profit_margin) * 0.5 +
-            (df['revenue_growth'] / max_revenue_growth) * 0.3 +
-            (df['revenue_per_employee'] / max_productivity) * 0.2
+            (df['revenue_per_employee'] / max_revenue_per_employee) * 0.5
         )
-        
-        # Advanced growth metrics
+
+        # Growth metrics
         df['composite_growth'] = (
-            df['revenue_growth'] * 0.6 +
-            df['profit_growth'] * 0.3 +
-            (df['market_value_per_employee'].pct_change().fillna(0)) * 0.1
+            df['revenue_growth'] * 0.4 +
+            df['profit_growth'] * 0.6
         )
-        
+
         # Interaction features
         df['size_efficiency_interaction'] = df['size_score'] * df['efficiency_score']
         df['growth_efficiency_interaction'] = df['composite_growth'] * df['efficiency_score']
-        
+
+        # Market sentiment indicators
+        df['market_confidence'] = np.where(
+            df['revenues'] > eps,
+            df['market_value'] / df['revenues'],
+            0
+        )
+
         # Volatility measures
         for metric in ['profit_margin', 'revenue_growth']:
             rolling_std = df.groupby('industry')[metric].transform(
                 lambda x: x.rolling(2, min_periods=1).std()
             ).fillna(0)
             df[f'{metric}_volatility'] = rolling_std
-        
+
         return df.replace([np.inf, -np.inf], 0)
 
-    def _handle_outliers(self, df, numerical_features):
-        """Enhanced outlier handling with feature-specific thresholds"""
-        df = df.copy()
+    def _check_cached_models(self):
+        """Check if all required model files exist in cache"""
+        all_files_exist = True
+        for target in self.target_variables:
+            target_files_exist = all(
+                self.cache_files[target][file_type].exists() 
+                for file_type in ['model', 'scaler', 'feature_names']
+            )
+            if not target_files_exist:
+                all_files_exist = False
+                break
         
-        # Define feature groups for different threshold treatments
-        threshold_groups = {
-            'market': ['market_value', 'market_value_per_employee', 'industry_market_value_zscore'],
-            'growth': ['revenue_growth', 'profit_growth', 'composite_growth'],
-            'efficiency': ['profit_margin', 'efficiency_score', 'revenue_per_employee'],
-            'ratio': ['size_efficiency_interaction', 'growth_efficiency_interaction'],
-            'default': []  # All other features
-        }
-        
-        thresholds = {
-            'market': 12.0,    # Increased for market features
-            'growth': 4.5,     # Reduced for growth metrics
-            'efficiency': 5.5, # Moderate for efficiency metrics
-            'ratio': 6.0,      # Standard for ratios
-            'default': 6.0     # Default threshold
-        }
-        
-        # Create reverse mapping of features to their groups
-        feature_to_group = {}
-        for group, features in threshold_groups.items():
-            for feature in features:
-                feature_to_group[feature] = group
-        
-        for feature in numerical_features:
-            Q1 = df[feature].quantile(0.25)
-            Q3 = df[feature].quantile(0.75)
-            IQR = Q3 - Q1
+        return all_files_exist and self.cache_files['evaluation_results'].exists()
+
+    def _load_cached_models(self):
+        """Load models and related data from cache"""
+        try:
+            print("Loading models from cache...")
+            models = {}
+            scalers = {}
+            feature_names = {}
             
-            # Get appropriate threshold
-            group = feature_to_group.get(feature, 'default')
-            threshold = thresholds[group]
+            for target in self.target_variables:
+                models[target] = joblib.load(self.cache_files[target]['model'])
+                scalers[target] = joblib.load(self.cache_files[target]['scaler'])
+                feature_names[target] = joblib.load(self.cache_files[target]['feature_names'])
             
-            lower_bound = Q1 - threshold * IQR
-            upper_bound = Q3 + threshold * IQR
+            evaluation_results = joblib.load(self.cache_files['evaluation_results'])
             
-            # Apply clipping with additional logging
-            original_outliers = ((df[feature] < lower_bound) | (df[feature] > upper_bound)).sum()
-            df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
+            print("Successfully loaded all models and data from cache!")
+            return models, evaluation_results, scalers, feature_names
+        except Exception as e:
+            print(f"Error loading cached models: {str(e)}")
+            return None, None, None, None
+
+    def _save_models(self, models, evaluation_results, scalers, feature_names):
+        """Save models and related data to cache"""
+        try:
+            print("\nSaving models and data to cache...")
+            for target in self.target_variables:
+                joblib.dump(models[target], self.cache_files[target]['model'])
+                joblib.dump(scalers[target], self.cache_files[target]['scaler'])
+                joblib.dump(feature_names[target], self.cache_files[target]['feature_names'])
             
-            if original_outliers > 0:
-                print(f"Handled {original_outliers} outliers in {feature}")
-        
-        return df
+            joblib.dump(evaluation_results, self.cache_files['evaluation_results'])
+            print("Successfully saved all models and data to cache!")
+        except Exception as e:
+            print(f"Error saving models to cache: {str(e)}")
 
     def prepare_training_data(self, df):
-        """Optimized data preparation with enhanced feature selection"""
+        """Prepare training data with enhanced feature engineering and scaling"""
         try:
             print("Starting data preparation...")
             df = self._engineer_features(df)
             
-            # Expanded feature set based on importance analysis
-            numerical_features = [
+            # Base feature set
+            base_numerical_features = [
                 'revenues', 'profits', 'employees',
-                'revenue_growth', 'profit_margin', 'revenue_per_employee',
-                'profit_per_employee', 'market_value_per_employee',
-                'profit_growth', 'efficiency_score', 'size_score',
+                'revenue_per_employee', 'profit_per_employee', 
+                'market_value_per_employee', 'profit_growth', 
+                'efficiency_score', 'size_score',
                 'industry_market_value_zscore', 'industry_revenues_zscore',
                 'industry_profits_zscore', 'industry_employees_zscore',
                 'industry_market_value_rel_median', 'industry_revenues_rel_median',
@@ -466,44 +540,57 @@ class ModelTrainer:
             ]
             
             categorical_features = ['industry']
-            target_variables = ['market_value', 'profit_margin', 'revenue_growth']
+            
+            # Create target-specific feature sets
+            target_features = {
+                'market_value': base_numerical_features + ['profit_margin', 'revenue_growth'],
+                'profit_margin': base_numerical_features + ['market_value', 'revenue_growth'],
+                'revenue_growth': base_numerical_features + ['market_value', 'profit_margin']
+            }
             
             print("Handling outliers...")
-            df = self._handle_outliers(df, numerical_features)
+            df = self._handle_outliers(df, base_numerical_features)
             
-            X = df[numerical_features + categorical_features].copy()
-            
-            # Enhanced scaling with feature-specific treatment
-            print("Applying robust scaling...")
-            scaler = RobustScaler(quantile_range=(5, 95))  # Adjusted quantile range
-            X[numerical_features] = scaler.fit_transform(X[numerical_features])
-            joblib.dump(scaler, self.models_path / 'scaler.joblib')
-            
-            # One-hot encoding with improved handling
-            print("Performing one-hot encoding...")
-            X = pd.get_dummies(X, columns=['industry'], drop_first=True, sparse=False)
-            joblib.dump(list(X.columns), self.models_path / 'feature_names.joblib')
-            
-            # Enhanced target processing
-            print("Processing target variables...")
-            y = df[target_variables].copy()
-            
-            # Log transform for market_value with offset
-            offset = np.abs(y['market_value'].min()) + 1 if y['market_value'].min() < 0 else 0
-            y['market_value'] = np.where(y['market_value'] + offset > 0,
-                                       np.log1p(y['market_value'] + offset),
-                                       0)
-            
-            # Stratified splitting with enhanced binning
-            print("Performing stratified splitting...")
             splits = {}
-            for target in target_variables:
-                # Dynamic bin calculation based on data distribution
-                n_bins = min(10, len(y[target].unique()))
-                bins = pd.qcut(y[target], q=n_bins, labels=False, duplicates='drop')
+            scalers = {}
+            feature_names = {}
+            
+            for target in self.target_variables:
+                print(f"\nPreparing data for {target} model...")
+                current_features = target_features[target]
+                X = df[current_features + categorical_features].copy()
                 
+                # Scale numerical features
+                print(f"Applying robust scaling...")
+                scaler = RobustScaler(quantile_range=(5, 95))
+                X[current_features] = scaler.fit_transform(X[current_features])
+                scalers[target] = scaler
+                
+                # One-hot encoding
+                X = pd.get_dummies(X, columns=['industry'], drop_first=True, sparse=False)
+                feature_names[target] = list(X.columns)
+                
+                # Process target variable
+                y = df[target].copy()
+                if target == 'market_value':
+                    offset = np.abs(y.min()) + 1 if y.min() < 0 else 0
+                    y = np.where(y + offset > 0, np.log1p(y + offset), 0)
+                
+                # Convert to numpy array if not already
+                y_array = y.values if isinstance(y, pd.Series) else y
+                
+                # Create bins for stratification
+                unique_values = np.unique(y_array)
+                n_bins = min(10, len(unique_values))
+                
+                if n_bins > 1:
+                    bins = pd.qcut(pd.Series(y_array), q=n_bins, labels=False, duplicates='drop')
+                else:
+                    bins = None
+                
+                # Perform the split with optional stratification
                 X_train, X_test, y_train, y_test = train_test_split(
-                    X, y[target],
+                    X, y_array,
                     test_size=0.2,
                     random_state=42,
                     stratify=bins
@@ -512,27 +599,25 @@ class ModelTrainer:
                 splits[target] = (X_train, X_test, y_train, y_test)
             
             print("Data preparation completed successfully!")
-            return splits
+            return splits, scalers, feature_names
         
         except Exception as e:
             print(f"Error in data preparation: {str(e)}")
             raise
 
-    def train_and_evaluate_models(self, splits, force_retrain=False):
-        """Enhanced training and evaluation with improved metrics, validation, and caching"""
+    def train_and_evaluate_models(self, splits, scalers, feature_names, force_retrain=False):
+        """Train and evaluate models with comprehensive metrics and proper caching"""
         if not force_retrain and self._check_cached_models():
             # Load cached models if available
-            models, evaluation_results, _, _ = self._load_cached_models()
-            if models and evaluation_results:
-                print("\nUsing cached models - skipping training")
-                return models, evaluation_results
+            return self._load_cached_models()
 
         print("\nNo cached models found or force_retrain=True. Starting model training...")
         evaluation_results = {}
         models = {}
         
-        for target, (X_train, X_test, y_train, y_test) in splits.items():
+        for target in self.target_variables:
             try:
+                X_train, X_test, y_train, y_test = splits[target]
                 print(f"\nTraining model for: {target}")
                 
                 model_config = self.model_params[target]
@@ -541,7 +626,6 @@ class ModelTrainer:
                 # Enhanced cross-validation
                 cv = KFold(n_splits=7, shuffle=True, random_state=42)
                 
-                # Compute multiple CV metrics
                 # Compute multiple CV metrics
                 cv_metrics = {
                     'r2': cross_val_score(model, X_train, y_train, cv=cv, 
@@ -591,8 +675,6 @@ class ModelTrainer:
                 }
                 
                 evaluation_results[target] = metrics
-                
-                # Print detailed metrics
                 self._print_metrics(target, metrics)
                 
             except Exception as e:
@@ -600,11 +682,9 @@ class ModelTrainer:
                 continue
         
         # Save models and related data to cache
-        scaler = joblib.load(self.models_path / 'scaler.joblib')
-        feature_names = joblib.load(self.models_path / 'feature_names.joblib')
-        self._save_models(models, evaluation_results, scaler, feature_names)
+        self._save_models(models, evaluation_results, scalers, feature_names)
         
-        return models, evaluation_results
+        return models, evaluation_results, scalers, feature_names
     
     def _print_metrics(self, target, metrics):
         """Print formatted metrics"""
@@ -621,35 +701,113 @@ class ModelTrainer:
         for feature, importance in sorted_features.items():
             print(f"{feature}: {importance:.4f}")
 
-# Usage script
+    def predict(self, input_data, target='market_value'):
+        """
+        Make predictions using trained models
+        """
+        try:
+            # Load cached models if available
+            models, _, scalers, feature_names = self._load_cached_models()
+            
+            if not models or target not in models:
+                raise ValueError(f"No trained model found for target: {target}")
+            
+            # Prepare input data
+            processed_data = self._engineer_features(input_data.copy())
+            
+            # Get relevant features
+            X = processed_data[feature_names[target]]
+            
+            # Scale features
+            X_scaled = scalers[target].transform(X)
+            
+            # Make prediction
+            prediction = models[target].predict(X_scaled)
+            
+            # Inverse transform for market_value
+            if target == 'market_value':
+                prediction = np.expm1(prediction)
+            
+            return prediction
+            
+        except Exception as e:
+            print(f"Error in prediction: {str(e)}")
+            raise
+
+    def _handle_outliers(self, df, numerical_features):
+        """Handle outliers with feature-specific thresholds"""
+        df = df.copy()
+        
+        # Define feature groups for different threshold treatments
+        threshold_groups = {
+            'market': ['market_value', 'market_value_per_employee', 'industry_market_value_zscore'],
+            'growth': ['revenue_growth', 'profit_growth', 'composite_growth'],
+            'efficiency': ['profit_margin', 'efficiency_score', 'revenue_per_employee'],
+            'ratio': ['size_efficiency_interaction', 'growth_efficiency_interaction'],
+            'default': []  # All other features
+        }
+        
+        thresholds = {
+            'market': 12.0,    # Increased for market features
+            'growth': 4.5,     # Reduced for growth metrics
+            'efficiency': 5.5, # Moderate for efficiency metrics
+            'ratio': 6.0,      # Standard for ratios
+            'default': 6.0     # Default threshold
+        }
+        
+        # Create reverse mapping of features to their groups
+        feature_to_group = {}
+        for group, features in threshold_groups.items():
+            for feature in features:
+                feature_to_group[feature] = group
+        
+        for feature in numerical_features:
+            try:
+                Q1 = df[feature].quantile(0.25)
+                Q3 = df[feature].quantile(0.75)
+                IQR = Q3 - Q1
+                
+                # Get appropriate threshold
+                group = feature_to_group.get(feature, 'default')
+                threshold = thresholds[group]
+                
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                
+                # Apply clipping with additional logging
+                original_outliers = ((df[feature] < lower_bound) | (df[feature] > upper_bound)).sum()
+                df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
+                
+                if original_outliers > 0:
+                    print(f"Handled {original_outliers} outliers in {feature}")
+            except KeyError as e:
+                print(f"Error handling outliers for feature {feature}: {str(e)}")
+                continue
+        
+        return df
+    
 if __name__ == "__main__":
     try:
-        # Initialize processor and trainer
         processor = DataProcessor()
         trainer = ModelTrainer(processor.base_path)
         
-        # Check if we have cached models
         if trainer._check_cached_models():
             print("Found cached models! Loading previous training results...")
-            models, evaluation_results, _, _ = trainer._load_cached_models()
+            models, evaluation_results, scalers, feature_names = trainer._load_cached_models()
             
-            # Print cached model metrics
             for target, metrics in evaluation_results.items():
                 trainer._print_metrics(target, metrics)
-                
         else:
             print("No cached models found. Processing data and training new models...")
-            # Load and process data
             combined_data = processor.load_and_combine_data()
-            
-            # Prepare data with train-test split
-            splits = trainer.prepare_training_data(combined_data)
-            
-            # Train and evaluate models
-            models, evaluation_results = trainer.train_and_evaluate_models(splits)
+            splits, scalers, feature_names = trainer.prepare_training_data(combined_data)
+            models, evaluation_results, scalers, feature_names = trainer.train_and_evaluate_models(
+                splits, scalers, feature_names
+            )
         
         print("\nProcess completed successfully!")
         
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         raise
+
