@@ -589,4 +589,3 @@ class MetaCorpSimulator:
         elif value > max_value * 0.7:
             return f"(strong performance for the industry)"
         return ""
-

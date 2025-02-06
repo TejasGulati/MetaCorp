@@ -578,6 +578,9 @@ class ModelTrainer:
                 
                 # Convert to numpy array if not already
                 y_array = y.values if isinstance(y, pd.Series) else y
+
+                feature_names[target] = list(X.columns)
+
                 
                 # Create bins for stratification
                 unique_values = np.unique(y_array)
@@ -702,34 +705,31 @@ class ModelTrainer:
             print(f"{feature}: {importance:.4f}")
 
     def predict(self, input_data, target='market_value'):
-        """
-        Make predictions using trained models
-        """
         try:
-            # Load cached models if available
+        # Load cached models and feature names
             models, _, scalers, feature_names = self._load_cached_models()
-            
+        
             if not models or target not in models:
                 raise ValueError(f"No trained model found for target: {target}")
-            
-            # Prepare input data
+        
+        # Prepare input data
             processed_data = self._engineer_features(input_data.copy())
-            
-            # Get relevant features
+        
+        # Ensure the input data has the same features as used during training
             X = processed_data[feature_names[target]]
-            
-            # Scale features
+        
+        # Scale features
             X_scaled = scalers[target].transform(X)
-            
-            # Make prediction
+        
+        # Make prediction
             prediction = models[target].predict(X_scaled)
-            
-            # Inverse transform for market_value
+        
+        # Inverse transform for market_value
             if target == 'market_value':
                 prediction = np.expm1(prediction)
-            
+        
             return prediction
-            
+        
         except Exception as e:
             print(f"Error in prediction: {str(e)}")
             raise
