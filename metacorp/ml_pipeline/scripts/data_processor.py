@@ -209,6 +209,17 @@ class ModelTrainer:
         
         self.processed_data_path = base_path / "data" / "processed"
         self.models_path = base_path / "data" / "models"
+        self.models_path.mkdir(parents=True, exist_ok=True)
+        
+        # Cache file paths
+        self.cache_files = {
+            'scaler': self.models_path / 'scaler.joblib',
+            'feature_names': self.models_path / 'feature_names.joblib',
+            'market_value': self.models_path / 'market_value_model.joblib',
+            'profit_margin': self.models_path / 'profit_margin_model.joblib',
+            'revenue_growth': self.models_path / 'revenue_growth_model.joblib',
+            'evaluation_results': self.models_path / 'evaluation_results.joblib'
+        }
         
         # Further optimized parameters based on feature importance analysis
         self.model_params = {
@@ -261,6 +272,43 @@ class ModelTrainer:
                 }
             }
         }
+
+    def _check_cached_models(self):
+        """Check if all required model files exist in cache"""
+        return all(cache_file.exists() for cache_file in self.cache_files.values())
+
+    def _load_cached_models(self):
+        """Load models and related data from cache"""
+        try:
+            print("Loading models from cache...")
+            models = {}
+            for target in ['market_value', 'profit_margin', 'revenue_growth']:
+                models[target] = joblib.load(self.cache_files[target])
+            
+            evaluation_results = joblib.load(self.cache_files['evaluation_results'])
+            scaler = joblib.load(self.cache_files['scaler'])
+            feature_names = joblib.load(self.cache_files['feature_names'])
+            
+            print("Successfully loaded all models and data from cache!")
+            return models, evaluation_results, scaler, feature_names
+        except Exception as e:
+            print(f"Error loading cached models: {str(e)}")
+            return None, None, None, None
+
+    def _save_models(self, models, evaluation_results, scaler, feature_names):
+        """Save models and related data to cache"""
+        try:
+            print("\nSaving models and data to cache...")
+            for target, model in models.items():
+                joblib.dump(model, self.cache_files[target])
+            
+            joblib.dump(evaluation_results, self.cache_files['evaluation_results'])
+            joblib.dump(scaler, self.cache_files['scaler'])
+            joblib.dump(feature_names, self.cache_files['feature_names'])
+            
+            print("Successfully saved all models and data to cache!")
+        except Exception as e:
+            print(f"Error saving models to cache: {str(e)}")
 
     def _engineer_features(self, df):
         """Enhanced feature engineering with focus on high-impact features"""
@@ -470,8 +518,16 @@ class ModelTrainer:
             print(f"Error in data preparation: {str(e)}")
             raise
 
-    def train_and_evaluate_models(self, splits):
-        """Enhanced training and evaluation with improved metrics and validation"""
+    def train_and_evaluate_models(self, splits, force_retrain=False):
+        """Enhanced training and evaluation with improved metrics, validation, and caching"""
+        if not force_retrain and self._check_cached_models():
+            # Load cached models if available
+            models, evaluation_results, _, _ = self._load_cached_models()
+            if models and evaluation_results:
+                print("\nUsing cached models - skipping training")
+                return models, evaluation_results
+
+        print("\nNo cached models found or force_retrain=True. Starting model training...")
         evaluation_results = {}
         models = {}
         
@@ -485,6 +541,7 @@ class ModelTrainer:
                 # Enhanced cross-validation
                 cv = KFold(n_splits=7, shuffle=True, random_state=42)
                 
+                # Compute multiple CV metrics
                 # Compute multiple CV metrics
                 cv_metrics = {
                     'r2': cross_val_score(model, X_train, y_train, cv=cv, 
@@ -535,15 +592,17 @@ class ModelTrainer:
                 
                 evaluation_results[target] = metrics
                 
-                # Save model
-                joblib.dump(model, self.models_path / f'{target}_model.joblib')
-                
                 # Print detailed metrics
                 self._print_metrics(target, metrics)
                 
             except Exception as e:
                 print(f"Error training model for {target}: {str(e)}")
                 continue
+        
+        # Save models and related data to cache
+        scaler = joblib.load(self.models_path / 'scaler.joblib')
+        feature_names = joblib.load(self.models_path / 'feature_names.joblib')
+        self._save_models(models, evaluation_results, scaler, feature_names)
         
         return models, evaluation_results
     
@@ -562,27 +621,34 @@ class ModelTrainer:
         for feature, importance in sorted_features.items():
             print(f"{feature}: {importance:.4f}")
 
-
-    
-    
-
 # Usage script
 if __name__ == "__main__":
     try:
-        # Initialize processor and load data
+        # Initialize processor and trainer
         processor = DataProcessor()
-        combined_data = processor.load_and_combine_data()
-        
-        # Initialize trainer
         trainer = ModelTrainer(processor.base_path)
         
-        # Prepare data with train-test split
-        splits = trainer.prepare_training_data(combined_data)
+        # Check if we have cached models
+        if trainer._check_cached_models():
+            print("Found cached models! Loading previous training results...")
+            models, evaluation_results, _, _ = trainer._load_cached_models()
+            
+            # Print cached model metrics
+            for target, metrics in evaluation_results.items():
+                trainer._print_metrics(target, metrics)
+                
+        else:
+            print("No cached models found. Processing data and training new models...")
+            # Load and process data
+            combined_data = processor.load_and_combine_data()
+            
+            # Prepare data with train-test split
+            splits = trainer.prepare_training_data(combined_data)
+            
+            # Train and evaluate models
+            models, evaluation_results = trainer.train_and_evaluate_models(splits)
         
-        # Train and evaluate models
-        models, evaluation_results = trainer.train_and_evaluate_models(splits)
-        
-        print("\nModel training and evaluation completed successfully!")
+        print("\nProcess completed successfully!")
         
     except Exception as e:
         print(f"An error occurred: {str(e)}")
