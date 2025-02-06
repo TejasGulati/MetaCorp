@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 from core.models import Company, Scenario, Simulation
 from .serializers import CompanySerializer, ScenarioSerializer, SimulationSerializer
-from ml_pipeline.simulation import run_simulation_task
+from metacorp.ml_pipeline.scripts.simulation import run_simulation_task
 
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
