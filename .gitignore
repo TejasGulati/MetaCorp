@@ -101,7 +101,7 @@ media/
 data/
 *.csv
 *.tsv
-*.json
+
 
 # Logs
 logs/
