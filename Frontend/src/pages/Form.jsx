@@ -6,7 +6,7 @@ function Form() {
   const [activeForm, setActiveForm] = React.useState("single"); 
 
   return (
-      <div className="w-full mx-auto p-6 bg-gradient-to-br from-[#f0fdfa] to-[#bbf7d0] rounded-lg shadow-lg ">
+      <div className="w-full mx-auto p-6 bg-gradient-to-br from-[#f0fdfa] to-[#bbf7d0] rounded-lg shadow-lg mt-20">
 
           <div className='flex justify-center items-center'>
 

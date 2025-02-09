@@ -23,7 +23,6 @@ const Home = () => {
 
     return (
         <div className="min-h-screen">
-            <Navbar/>
             <main className="container mx-auto px-4 py-12">
                 <section id="home" className="text-center mb-20 pt-16">
                     <h2 className="text-5xl font-extrabold text-green-900 mb-6">
