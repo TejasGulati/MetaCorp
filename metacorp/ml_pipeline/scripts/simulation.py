@@ -20,7 +20,7 @@ class MetaCorpSimulator:
         else:
             self.base_path = Path.cwd()
         
-        self.models_path = self.base_path / "data" / "models"
+        self.models_path = self.base_path / "ml_pipeline"/ "data" / "models"
         self.models_path.mkdir(parents=True, exist_ok=True)
             
         try:

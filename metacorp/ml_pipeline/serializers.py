@@ -19,7 +19,7 @@ class DecisionSerializer(serializers.Serializer):
 
     def validate(self, data):
         """
-        Check that all rates are between 0 and 1
+        Check that all rates are between 0 and 1.
         """
         for field, value in data.items():
             if not 0 <= value <= 1:
@@ -35,19 +35,20 @@ class SimulationInputSerializer(serializers.Serializer):
         default='baseline'
     )
 
+# In your serializers.py
 class ParallelSimulationInputSerializer(serializers.Serializer):
-    company_data = CompanyDataSerializer()
-    base_decisions = DecisionSerializer()
+    company_data = serializers.DictField()  # Remove child=FloatField()
+    base_decisions = serializers.DictField(child=serializers.FloatField())
     decision_variations = serializers.ListField(
-        child=DecisionSerializer(),
-        min_length=1,
-        max_length=5
+        child=serializers.DictField(child=serializers.FloatField())
     )
-    num_years = serializers.IntegerField(default=5, min_value=1, max_value=20)
-    monte_carlo_sims = serializers.IntegerField(default=50, min_value=10, max_value=1000)
-
+    num_years = serializers.IntegerField()
+    monte_carlo_sims = serializers.IntegerField()
 class SimulationResultSerializer(serializers.ModelSerializer):
+    visualizations = serializers.JSONField(default=dict)  # Ensure visualizations are included
+    insights = serializers.JSONField(default=dict)  # Ensure insights are included
+
     class Meta:
         model = SimulationResult
-        fields = ['id', 'input_data', 'results', 'insights', 'is_parallel', 'created_at']
+        fields = ['id', 'input_data', 'results', 'insights', 'visualizations', 'is_parallel', 'created_at']
         read_only_fields = fields

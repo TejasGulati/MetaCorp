@@ -25,20 +25,21 @@ def save_plot_to_static(fig, plot_name):
     """Save plot to static directory and return its URL path"""
     # Create a unique filename using UUID
     filename = f"{plot_name}_{uuid.uuid4()}.png"
-    
-    # Define path relative to STATIC_ROOT
-    plots_dir = Path(settings.STATIC_ROOT) / 'plots'
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    # Define the path relative to STATICFILES_DIRS
+    plot_dir = os.path.join(settings.STATICFILES_DIRS[0], 'plots')
+    os.makedirs(plot_dir, exist_ok=True)
+
     # Full path to save the file
-    file_path = plots_dir / filename
-    
+    file_path = os.path.join(plot_dir, filename)
+
     # Save the plot
     fig.savefig(file_path, format='png', bbox_inches='tight', dpi=300)
     plt.close()
-    
+
     # Return the URL path
-    return f'/static/plots/{filename}'
+    return f"{settings.STATIC_URL}plots/{filename}"
+
 
 def create_visualizations(results, output_dir):
     """Create visualizations and return their URLs"""
