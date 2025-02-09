@@ -2,37 +2,10 @@ import React, { useEffect, useState ,useContext} from 'react';
 import { ModeContext } from '../context/Mode';
 
 const Result = () => {
-    const {mode}=useContext(ModeContext)
+    const {mode,data}=useContext(ModeContext)
     const isParallel=(mode==="single")?false:true;
-    const [simulationData,setSimulationData]=useState()
+    const simulationData=data;
 
-    console.log(isParallel,mode);
-    useEffect(() => {
-        const fetchResults = async () => {
-            try {
-                const endpoint = mode === 'parallel' 
-                    ? 'http://localhost:8000/api/simulate/parallel/'
-                    : 'http://localhost:8000/api/simulate/';
-                
-                const response = await fetch(endpoint, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setSimulationData(data)
-            } catch (error) {
-                console.error('Error fetching simulation results:', error);;
-            }
-        };
-
-        fetchResults();
-    }, []);
-    
     
     const getRealities = () => {
         const realities = [];

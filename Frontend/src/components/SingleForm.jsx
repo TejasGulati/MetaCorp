@@ -5,7 +5,7 @@ import { ModeContext } from '../context/Mode';
 
 
 const SingleForm = () => {
-    const { changeMode } = React.useContext(ModeContext);
+    const { changeMode,setData } = React.useContext(ModeContext);
     const navigate=useNavigate()
     const { register, handleSubmit } = useForm({
         defaultValues: {
@@ -67,7 +67,7 @@ const SingleForm = () => {
             }
     
             const result = await response.json();
-            console.log('Simulation results:', result);
+            setData(result)
             navigate("/simulation-results");
         } catch (error) {
             console.error('Error running simulation:', error);

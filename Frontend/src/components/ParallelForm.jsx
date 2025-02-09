@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ModeContext } from '../context/Mode';
 
 const ParallelForm = () => {
-    const {changeMode } = React.useContext(ModeContext);
+    const {changeMode ,setData} = React.useContext(ModeContext);
     const navigate =useNavigate()
     const { register, control, handleSubmit } = useForm({
         defaultValues: {
@@ -84,7 +84,7 @@ const ParallelForm = () => {
     
             const result = await response.json();
             console.log('Parallel simulation results:', result);
-            
+            setData(result)
             navigate("/simulation-results");
         } catch (error) {
             console.error('Error running parallel simulation:', error);
