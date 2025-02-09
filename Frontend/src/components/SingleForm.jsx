@@ -3,11 +3,22 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { ModeContext } from '../context/Mode';
 import { api } from '../utils/api';
+import { ArrowRight, AlertCircle } from 'lucide-react';
+
+const GradientBackground = () => (
+    <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.2),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.25),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(52,211,153,0.2),transparent_60%)]" />
+        <div className="absolute top-0 left-0 right-0 h-96 bg-gradient-to-b from-white/40 to-transparent" />
+    </div>
+);
 
 const SingleForm = () => {
-    const { changeMode,setData } = React.useContext(ModeContext);
+    const { changeMode, setData } = React.useContext(ModeContext);
     const navigate = useNavigate();
-    const { register, handleSubmit } = useForm({
+    const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
             company_data: {
                 name: '',
@@ -50,12 +61,12 @@ const SingleForm = () => {
                 market_expansion: Number(data.decisions.market_expansion)
             },
             num_years: Number(data.num_years),
-            market_scenario: data.market_scenario 
+            market_scenario: data.market_scenario
         };
-        
+
         try {
             const result = await api.post('/simulate/', processedData);
-            setData(result)
+            setData(result);
             console.log('Simulation results:', result);
             navigate("/simulation-results");
         } catch (error) {
@@ -63,165 +74,119 @@ const SingleForm = () => {
         }
     };
 
-
     return (
-        <div className="max-w-4xl mx-auto p-6 bg-gradient-to-br from-[#d1fae5] to-[#a7f3d0] rounded-lg shadow-lg">
-            <h2 className="text-2xl font-bold mb-6 text-[#064e3b]">Single Simulation Parameters</h2>
+        <div className="min-h-screen relative">
+            <GradientBackground />
             
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="relative max-w-6xl mx-auto p-8">
+                <div className="relative backdrop-blur-xl bg-white/30 rounded-3xl shadow-2xl overflow-hidden border border-green-200/50 p-8">
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600" />
+                    
+                    <h2 className="text-4xl font-bold bg-gradient-to-r from-green-900 via-emerald-800 to-teal-900 bg-clip-text text-transparent mb-8">
+                        Single Business Simulation
+                    </h2>
 
-                <div className="bg-white/50 p-6 rounded-lg">
-                    <h3 className="text-xl font-semibold mb-4 text-[#064e3b]">Company Data</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Company Name</label>
-                            <input
-                                {...register("company_data.name")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                        {/* Company Data Section */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-300/30 to-teal-300/30 rounded-2xl blur-xl transform group-hover:scale-105 transition-transform duration-300" />
+                            <div className="relative bg-white/60 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-green-200/50">
+                                <h3 className="text-2xl font-semibold bg-gradient-to-r from-green-900 to-teal-900 bg-clip-text text-transparent mb-6">
+                                    Company Information
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {['name', 'industry', 'revenues', 'profits', 'market_value', 'employees', 'revenue_growth', 'profit_margin', 'costs'].map((field) => (
+                                        <div key={field} className="relative">
+                                            <label className="block text-emerald-900 font-medium mb-2">
+                                                {field.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                                            </label>
+                                            <input
+                                                {...register(`company_data.${field}`)}
+                                                type={['revenues', 'profits', 'market_value', 'employees', 'revenue_growth', 'profit_margin', 'costs'].includes(field) ? 'number' : 'text'}
+                                                step="0.01"
+                                                className="w-full p-3 border border-emerald-200 rounded-lg bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all duration-200"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Industry</label>
-                            <input
-                                {...register("company_data.industry")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
+                        {/* Strategic Decisions Section */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-300/30 to-green-300/30 rounded-2xl blur-xl transform group-hover:scale-105 transition-transform duration-300" />
+                            <div className="relative bg-white/60 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-green-200/50">
+                                <h3 className="text-2xl font-semibold bg-gradient-to-r from-green-900 to-teal-900 bg-clip-text text-transparent mb-6">
+                                    Strategic Decisions
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {['hiring_rate', 'rd_investment', 'market_expansion'].map((field) => (
+                                        <div key={field} className="relative">
+                                            <label className="block text-emerald-900 font-medium mb-2">
+                                                {field.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                                            </label>
+                                            <input
+                                                {...register(`decisions.${field}`)}
+                                                type="number"
+                                                step="0.01"
+                                                className="w-full p-3 border border-emerald-200 rounded-lg bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all duration-200"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Revenues</label>
-                            <input
-                                type="number"
-                                {...register("company_data.revenues")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
+                        {/* Simulation Parameters Section */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-teal-300/30 to-emerald-300/30 rounded-2xl blur-xl transform group-hover:scale-105 transition-transform duration-300" />
+                            <div className="relative bg-white/60 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-green-200/50">
+                                <h3 className="text-2xl font-semibold bg-gradient-to-r from-green-900 to-teal-900 bg-clip-text text-transparent mb-6">
+                                    Simulation Parameters
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="relative">
+                                        <label className="block text-emerald-900 font-medium mb-2">
+                                            Number of Years
+                                        </label>
+                                        <input
+                                            {...register("num_years")}
+                                            type="number"
+                                            className="w-full p-3 border border-emerald-200 rounded-lg bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all duration-200"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <label className="block text-emerald-900 font-medium mb-2">
+                                            Market Scenario
+                                        </label>
+                                        <select
+                                            {...register("market_scenario")}
+                                            className="w-full p-3 border border-emerald-200 rounded-lg bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all duration-200"
+                                        >
+                                            <option value="baseline">Baseline</option>
+                                            <option value="optimistic">Optimistic</option>
+                                            <option value="pessimistic">Pessimistic</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Profits</label>
-                            <input
-                                type="number"
-                                {...register("company_data.profits")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Market Value</label>
-                            <input
-                                type="number"
-                                {...register("company_data.market_value")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Employees</label>
-                            <input
-                                type="number"
-                                {...register("company_data.employees")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Revenue Growth (%)</label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                {...register("company_data.revenue_growth")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Profit Margin (%)</label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                {...register("company_data.profit_margin")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Costs</label>
-                            <input
-                                type="number"
-                                {...register("company_data.costs")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-                    </div>
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            className="relative group w-full overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 transform group-hover:scale-105 transition-transform duration-300" />
+                            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:24px_24px]" />
+                            <div className="relative flex items-center justify-center space-x-2 py-4 text-lg font-semibold text-white">
+                                <span>Submit Simulation</span>
+                                <ArrowRight className="w-5 h-5" />
+                            </div>
+                        </button>
+                    </form>
                 </div>
-
-                <div className="bg-white/50 p-6 rounded-lg">
-                    <h3 className="text-xl font-semibold mb-4 text-[#064e3b]">Strategic Decisions</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Hiring Rate</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                {...register("decisions.hiring_rate")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">R&D Investment</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                {...register("decisions.rd_investment")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Market Expansion</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                {...register("decisions.market_expansion")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white/50 p-6 rounded-lg">
-                    <h3 className="text-xl font-semibold mb-4 text-[#064e3b]">Simulation Parameters</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Number of Years</label>
-                            <input
-                                type="number"
-                                {...register("num_years")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[#065f46] font-medium mb-1">Market Scenario</label>
-                            <select
-                                {...register("market_scenario")}
-                                className="w-full p-2 border border-[#059669] rounded focus:outline-none focus:ring-2 focus:ring-[#059669]"
-                            >
-                                <option value="baseline">Baseline</option>
-                                <option value="optimistic">Optimistic</option>
-                                <option value="pessimistic">Pessimistic</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <button
-                    type="submit"
-                    className="w-full bg-[#059669] hover:bg-[#065f46] text-white font-bold py-2 px-4 rounded transition-colors duration-200"
-                >
-                    Submit Simulation
-                </button>
-            </form>
+            </div>
         </div>
     );
 };
