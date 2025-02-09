@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { ModeContext } from '../context/Mode';
 import { api } from '../utils/api';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 const GradientBackground = () => (
     <div className="absolute inset-0">
@@ -17,6 +17,7 @@ const GradientBackground = () => (
 
 const SingleForm = () => {
     const { changeMode, setData } = React.useContext(ModeContext);
+    const [isLoading, setIsLoading] = React.useState(false);
     const navigate = useNavigate();
     const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -42,6 +43,7 @@ const SingleForm = () => {
     });
 
     const onSubmit = async (data) => {
+        setIsLoading(true)
         await changeMode("single");
         const processedData = {
             ...data,
@@ -175,15 +177,25 @@ const SingleForm = () => {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            className="relative group w-full overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 transform group-hover:scale-105 transition-transform duration-300" />
-                            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:24px_24px]" />
-                            <div className="relative flex items-center justify-center space-x-2 py-4 text-lg font-semibold text-white">
-                                <span>Submit Simulation</span>
-                                <ArrowRight className="w-5 h-5" />
-                            </div>
-                        </button>
+                            disabled={isLoading}
+                            className="relative group w-full overflow-hidden disabled:opacity-50"
+        >
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 transform group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:24px_24px]" />
+                    <div className="relative flex items-center justify-center space-x-2 py-4 text-lg font-semibold text-white">
+                {isLoading ? (
+                <>
+                <Loader2 className="animate-spin w-5 h-5" />
+                <span>Submitting...</span>
+                </>
+            ) : (
+                <>
+                <span>Submit Simulation</span>
+                <ArrowRight className="w-5 h-5" />
+                </>
+            )}
+            </div>
+        </button>
                     </form>
                 </div>
             </div>
